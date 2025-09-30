@@ -1,0 +1,39 @@
+// middleware.ts (Next.js Edge middleware)
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+
+const BASIC_PASSWORD = process.env.DEMO_PASSWORD; // set this in Vercel env
+
+export function middleware(req: NextRequest) {
+  // Allow static files (optional)
+  if (req.nextUrl.pathname.startsWith("/_next") || req.nextUrl.pathname.includes(".png") ) {
+    return NextResponse.next();
+  }
+
+  // Check cookie
+  const authCookie = req.cookies.get("demo-auth");
+  if (authCookie && authCookie === BASIC_PASSWORD) {
+    return NextResponse.next();
+  }
+
+  // If POST to /_login (simple login form), accept password
+  if (req.nextUrl.pathname === "/_login" && req.method === "POST") {
+    // For simplicity: read form body and set cookie server-side (must use different handler or API)
+    // You can implement a simple API /api/login to set cookie after validating password.
+    return NextResponse.next();
+  }
+
+  // If already have header Authorization (for curl/test), accept Basic auth header
+  const authHeader = req.headers.get("authorization") || "";
+  if (authHeader.startsWith("Basic ")) {
+    const b64 = authHeader.slice(6);
+    const plain = Buffer.from(b64, "base64").toString();
+    const [, pass] = plain.split(":"); // username:password; ignore username
+    if (pass === BASIC_PASSWORD) return NextResponse.next();
+  }
+
+  // Otherwise redirect to a simple login page
+  const loginUrl = new URL("/_login", req.url);
+  loginUrl.searchParams.set("from", req.nextUrl.pathname);
+  return NextResponse.redirect(loginUrl);
+}
